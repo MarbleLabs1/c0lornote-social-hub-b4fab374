@@ -1,67 +1,56 @@
 
-import { PostCard, Post } from "@/components/posts/PostCard";
-import { ScrollArea } from "@/components/ui/scroll-area";
-
-// Mock data
-const posts: Post[] = [
-  {
-    id: "1",
-    user: {
-      id: "user1",
-      username: "sarah_designs",
-      avatar: "https://source.unsplash.com/random/100x100?face=1",
-    },
-    image: "https://source.unsplash.com/random/600x600?colorful=1",
-    caption: "Colors inspire creativity! What's your favorite color? 🎨 #colors #design #creativity",
-    likes: 342,
-    comments: 23,
-    createdAt: new Date("2023-07-15T10:30:00"),
-    bookmarked: false,
-    liked: true,
-  },
-  {
-    id: "2",
-    user: {
-      id: "user2",
-      username: "travel_mike",
-      avatar: "https://source.unsplash.com/random/100x100?face=2",
-    },
-    image: "https://source.unsplash.com/random/600x600?colorful=2",
-    caption: "Found this amazing spot during my hike today! The colors were just incredible in person.",
-    likes: 189,
-    comments: 14,
-    createdAt: new Date("2023-07-14T14:45:00"),
-    bookmarked: true,
-    liked: false,
-  },
-  {
-    id: "3",
-    user: {
-      id: "user3",
-      username: "color_explorer",
-      avatar: "https://source.unsplash.com/random/100x100?face=3",
-    },
-    image: "https://source.unsplash.com/random/600x600?colorful=3",
-    caption: "New palette inspiration from today's sunset. Nature is the best designer.",
-    likes: 567,
-    comments: 42,
-    createdAt: new Date("2023-07-13T19:20:00"),
-    bookmarked: false,
-    liked: false,
-  },
-];
+import React from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Card, CardContent } from "@/components/ui/card";
+import { CreatePostForm } from "@/components/posts/CreatePostForm";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
+import { Post } from "@/components/posts/PostCard";
+import PostsList from "@/components/posts/PostsList";
 
 export default function Home() {
+  const { user, isAuthenticated } = useAuth();
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load posts from localStorage on initial render
+  useEffect(() => {
+    const storedPosts = localStorage.getItem("c0lornote_posts");
+    if (storedPosts) {
+      try {
+        setPosts(JSON.parse(storedPosts));
+      } catch (err) {
+        console.error("Failed to parse posts data", err);
+      }
+    }
+    setIsLoading(false);
+  }, []);
+
+  // Save posts to localStorage whenever they change
+  useEffect(() => {
+    if (posts.length > 0) {
+      localStorage.setItem("c0lornote_posts", JSON.stringify(posts));
+    }
+  }, [posts]);
+
+  const handlePostCreated = (newPost: Post) => {
+    setPosts((prev) => [newPost, ...prev]);
+    toast.success("Post created successfully!");
+  };
+
   return (
-    <div className="container max-w-4xl">
-      <h1 className="text-2xl font-bold mb-6">Your Feed</h1>
-      <ScrollArea className="h-[calc(100vh-12rem)]">
-        <div className="pb-4">
-          {posts.map(post => (
-            <PostCard key={post.id} post={post} />
-          ))}
-        </div>
-      </ScrollArea>
+    <div className="container py-6 max-w-4xl">
+      {isAuthenticated && (
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <CreatePostForm onPostCreated={handlePostCreated} />
+          </CardContent>
+        </Card>
+      )}
+
+      <h2 className="text-2xl font-bold mb-6">Feed</h2>
+      
+      <PostsList posts={posts} isLoading={isLoading} />
     </div>
   );
 }

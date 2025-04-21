@@ -1,115 +1,137 @@
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { ImagePlus, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { Image, X } from "lucide-react";
+import { Post } from "./PostCard";
 
-export function CreatePostForm() {
-  const [isLoading, setIsLoading] = useState(false);
+interface CreatePostFormProps {
+  onPostCreated?: (post: Post) => void;
+}
+
+export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const [caption, setCaption] = useState("");
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSelectedImage(file);
-      setPreviewUrl(URL.createObjectURL(file));
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const removeImage = () => {
+    setImagePreview(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedImage) {
-      toast.error("Please select an image to upload");
+    if (!caption.trim() && !imagePreview) {
       return;
     }
     
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      toast.success("Post created successfully!");
-      setIsLoading(false);
+    try {
+      // Here we create a new post with mock data
+      const newPost: Post = {
+        id: `post-${Date.now()}`,
+        user: {
+          id: user?.id || "user-1",
+          username: user?.username || "anonymous",
+          avatar: user?.avatar || "https://source.unsplash.com/random/100x100?portrait",
+        },
+        image: imagePreview || undefined,
+        caption: caption,
+        likes: 0,
+        comments: 0,
+        createdAt: new Date(),
+        bookmarked: false,
+        liked: false,
+      };
+      
+      // In a real app, we would send this to an API
+      // But for now we'll just call the callback
+      if (onPostCreated) {
+        onPostCreated(newPost);
+      }
+      
+      // Reset the form
       setCaption("");
-      setSelectedImage(null);
-      setPreviewUrl(null);
-    }, 1500);
+      setImagePreview(null);
+    } catch (error) {
+      console.error("Error creating post:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid w-full max-w-sm items-center gap-1.5">
-        <Label htmlFor="image">Image</Label>
-        <div className="flex flex-col gap-4">
-          {previewUrl ? (
-            <div className="relative rounded-md overflow-hidden">
-              <img 
-                src={previewUrl} 
-                alt="Preview" 
-                className="w-full h-auto max-h-[300px] object-cover"
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="absolute bottom-2 right-2"
-                onClick={() => {
-                  setSelectedImage(null);
-                  setPreviewUrl(null);
-                }}
-              >
-                Change Image
-              </Button>
-            </div>
-          ) : (
-            <div 
-              className="border-2 border-dashed rounded-md p-8 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50"
-              onClick={() => document.getElementById('image')?.click()}
-            >
-              <ImagePlus className="h-8 w-8 text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">Click to upload an image</p>
-            </div>
-          )}
-          <Input
-            id="image"
+      <Textarea
+        placeholder="What's on your mind?"
+        value={caption}
+        onChange={(e) => setCaption(e.target.value)}
+        rows={3}
+        className="resize-none"
+      />
+      
+      {imagePreview && (
+        <div className="relative">
+          <img 
+            src={imagePreview} 
+            alt="Preview" 
+            className="max-h-64 w-auto rounded-md object-cover"
+          />
+          <Button
+            type="button"
+            size="icon"
+            variant="destructive"
+            className="absolute top-2 right-2 h-8 w-8"
+            onClick={removeImage}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+      
+      <div className="flex justify-between items-center">
+        <div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => document.getElementById('image-upload')?.click()}
+          >
+            <Image className="h-5 w-5 mr-2" />
+            Add Image
+          </Button>
+          <input
             type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
+            id="image-upload"
+            accept="image/*"
             onChange={handleImageChange}
+            className="hidden"
           />
         </div>
+        
+        <Button 
+          type="submit"
+          disabled={isLoading || (!caption.trim() && !imagePreview)}
+          className="gradient-bg text-white hover:opacity-90"
+        >
+          {isLoading ? "Posting..." : "Post"}
+        </Button>
       </div>
-      
-      <div className="grid w-full gap-1.5">
-        <Label htmlFor="caption">Caption (optional)</Label>
-        <Textarea
-          id="caption"
-          placeholder="Write a caption..."
-          className="resize-none"
-          maxLength={280}
-          value={caption}
-          onChange={(e) => setCaption(e.target.value)}
-        />
-        <div className="text-xs text-muted-foreground text-right">
-          {caption.length}/280
-        </div>
-      </div>
-      
-      <Button type="submit" className="w-full gradient-bg text-white hover:opacity-90" disabled={isLoading}>
-        {isLoading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
-            Creating Post...
-          </>
-        ) : (
-          "Create Post"
-        )}
-      </Button>
     </form>
   );
-}
+};
