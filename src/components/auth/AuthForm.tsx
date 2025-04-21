@@ -26,6 +26,7 @@ const loginSchema = z.object({
 });
 
 const registerSchema = z.object({
+  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   username: z.string().min(3, { message: "Username must be at least 3 characters" }),
   email: z.string().email({ message: "Please enter a valid email address" }),
   password: z.string().min(8, { message: "Password must be at least 8 characters" }),
@@ -50,7 +51,7 @@ export function AuthForm({ isRegister = false }: AuthFormProps) {
   const form = useForm<LoginFormValues | RegisterFormValues>({
     resolver: zodResolver(isRegister ? registerSchema : loginSchema),
     defaultValues: isRegister
-      ? { username: "", email: "", password: "", confirmPassword: "" }
+      ? { name: "", username: "", email: "", password: "", confirmPassword: "" }
       : { email: "", password: "" },
   });
 
@@ -60,7 +61,12 @@ export function AuthForm({ isRegister = false }: AuthFormProps) {
     try {
       if (isRegister) {
         const registerData = data as RegisterFormValues;
-        await register(registerData.username, registerData.email, registerData.password);
+        await register(
+          registerData.username, 
+          registerData.email, 
+          registerData.password,
+          registerData.name
+        );
         toast.success("Account created successfully");
       } else {
         const loginData = data as LoginFormValues;
@@ -70,7 +76,8 @@ export function AuthForm({ isRegister = false }: AuthFormProps) {
       
       navigate("/");
     } catch (error) {
-      toast.error(isRegister ? "Failed to create account" : "Failed to log in");
+      const errorMsg = error instanceof Error ? error.message : "An unknown error occurred";
+      toast.error(isRegister ? `Registration failed: ${errorMsg}` : `Login failed: ${errorMsg}`);
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -94,19 +101,34 @@ export function AuthForm({ isRegister = false }: AuthFormProps) {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {isRegister && (
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Username</FormLabel>
-                    <FormControl>
-                      <Input placeholder="johndoe" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <>
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="John Doe" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Username</FormLabel>
+                      <FormControl>
+                        <Input placeholder="johndoe" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
             )}
             <FormField
               control={form.control}

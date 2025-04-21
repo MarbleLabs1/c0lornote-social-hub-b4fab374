@@ -6,6 +6,8 @@ interface User {
   username: string;
   email: string;
   avatar: string;
+  name?: string; // Added name field that user can set
+  bio?: string;
 }
 
 interface AuthContextType {
@@ -13,8 +15,9 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
+  register: (username: string, email: string, password: string, name?: string) => Promise<void>;
   logout: () => void;
+  updateProfile: (profileData: Partial<User>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -43,41 +46,94 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Simulate API call
     return new Promise<void>((resolve, reject) => {
       setTimeout(() => {
-        // Simulate successful login
-        const mockUser: User = {
-          id: "user-1",
-          username: "c0lornote_user",
-          email,
-          avatar: "https://source.unsplash.com/random/400x400?portrait"
-        };
+        // Check if user exists in localStorage (simple authentication simulation)
+        const usersStr = localStorage.getItem("c0lornote_users");
+        if (usersStr) {
+          const users = JSON.parse(usersStr);
+          const foundUser = users.find((u: any) => u.email === email);
+          
+          if (foundUser && foundUser.password === password) {
+            // Don't store password in the user object in context
+            const { password, ...userWithoutPassword } = foundUser;
+            setUser(userWithoutPassword);
+            localStorage.setItem("c0lornote_user", JSON.stringify(userWithoutPassword));
+            setIsLoading(false);
+            resolve();
+            return;
+          }
+        }
         
-        setUser(mockUser);
-        localStorage.setItem("c0lornote_user", JSON.stringify(mockUser));
         setIsLoading(false);
-        resolve();
-      }, 1500);
+        reject(new Error("Invalid email or password"));
+      }, 1000);
     });
   };
 
-  const register = async (username: string, email: string, password: string) => {
+  const register = async (username: string, email: string, password: string, name?: string) => {
     setIsLoading(true);
     
     // Simulate API call
     return new Promise<void>((resolve, reject) => {
       setTimeout(() => {
-        // Simulate successful registration
-        const mockUser: User = {
+        // Check if user already exists
+        const usersStr = localStorage.getItem("c0lornote_users");
+        const users = usersStr ? JSON.parse(usersStr) : [];
+        
+        if (users.some((u: any) => u.email === email || u.username === username)) {
+          setIsLoading(false);
+          reject(new Error("User with this email or username already exists"));
+          return;
+        }
+        
+        // Create new user
+        const newUser = {
           id: "user-" + Date.now(),
           username,
           email,
-          avatar: "https://source.unsplash.com/random/400x400?portrait"
+          password, // Note: In a real app, this would be hashed
+          name: name || username, // Use name if provided, otherwise use username
+          avatar: `https://source.unsplash.com/random/400x400?face&_=${Date.now()}`,
+          bio: `Hi, I'm ${name || username}! This is my c0lornote profile.`,
         };
         
-        setUser(mockUser);
-        localStorage.setItem("c0lornote_user", JSON.stringify(mockUser));
+        // Save to "database" (localStorage)
+        users.push(newUser);
+        localStorage.setItem("c0lornote_users", JSON.stringify(users));
+        
+        // Login the new user (without the password in the context)
+        const { password: _, ...userWithoutPassword } = newUser;
+        setUser(userWithoutPassword);
+        localStorage.setItem("c0lornote_user", JSON.stringify(userWithoutPassword));
+        
         setIsLoading(false);
         resolve();
-      }, 1500);
+      }, 1000);
+    });
+  };
+
+  const updateProfile = async (profileData: Partial<User>) => {
+    return new Promise<void>((resolve, reject) => {
+      if (!user) {
+        reject(new Error("No user logged in"));
+        return;
+      }
+
+      // Update user in context
+      const updatedUser = { ...user, ...profileData };
+      setUser(updatedUser);
+      localStorage.setItem("c0lornote_user", JSON.stringify(updatedUser));
+
+      // Also update in the users list
+      const usersStr = localStorage.getItem("c0lornote_users");
+      if (usersStr) {
+        const users = JSON.parse(usersStr);
+        const updatedUsers = users.map((u: any) => 
+          u.id === user.id ? { ...u, ...profileData } : u
+        );
+        localStorage.setItem("c0lornote_users", JSON.stringify(updatedUsers));
+      }
+
+      resolve();
     });
   };
 
@@ -94,7 +150,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         login,
         register,
-        logout
+        logout,
+        updateProfile
       }}
     >
       {children}
